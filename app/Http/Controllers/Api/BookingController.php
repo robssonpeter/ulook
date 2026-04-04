@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\BookingResource;
 use App\Models\Booking;
+use App\Models\Professional;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -18,9 +19,9 @@ class BookingController extends Controller
 
         // Check if the route name or path indicates professional dashboard
         if ($request->is('api/professional/*') || $user->role === 'professional') {
-             $query->where('professional_id', $user->id);
+            $query->where('professional_id', $user->id);
         } else {
-             $query->where('customer_id', $user->id);
+            $query->where('customer_id', $user->id);
         }
 
         return BookingResource::collection($query->paginate());
@@ -32,13 +33,8 @@ class BookingController extends Controller
             return response()->json(['message' => 'Only customers can create bookings.'], 403);
         }
 
-        $validated = $request->validate([
-            'professional_id' => ['required', 'exists:users,id', function ($attribute, $value, $fail) {
-                $user = User::find($value);
-                if (!$user || $user->role !== 'professional') {
-                    $fail('The selected professional is invalid.');
-                }
-            }],
+        $request->validate([
+            'professional_id' => 'required',
             'service_id' => 'required|exists:services,id',
             'booking_date' => 'required|date|after_or_equal:today',
             'booking_time' => 'required',
@@ -46,18 +42,45 @@ class BookingController extends Controller
             'deposit_amount' => 'nullable|numeric|min:0',
         ]);
 
+        $professionalId = $request->professional_id;
+        $professionalUser = null;
+
+        // Try to find by user_id first (original behavior)
+        $professionalUser = User::where('id', $professionalId)
+            ->where('role', 'professional')
+            ->first();
+
+        // If not found, try to find by professional profile ID (mobile app behavior)
+        if (! $professionalUser) {
+            $professional = Professional::find($professionalId);
+            if ($professional) {
+                $professionalUser = User::where('id', $professional->user_id)
+                    ->where('role', 'professional')
+                    ->first();
+            }
+        }
+
+        if (! $professionalUser) {
+            return response()->json([
+                'message' => 'The selected professional is invalid.',
+                'errors' => ['professional_id' => ['The selected professional is invalid.']],
+            ], 422);
+        }
+
         $booking = Booking::create([
             'customer_id' => $request->user()->id,
-            'professional_id' => $validated['professional_id'],
-            'service_id' => $validated['service_id'],
-            'booking_date' => $validated['booking_date'],
-            'booking_time' => $validated['booking_time'],
-            'total_price' => $validated['total_price'],
-            'deposit_amount' => $validated['deposit_amount'] ?? null,
+            'professional_id' => $professionalUser->id,
+            'service_id' => $request->service_id,
+            'booking_date' => $request->booking_date,
+            'booking_time' => $request->booking_time,
+            'total_price' => $request->total_price,
+            'deposit_amount' => $request->deposit_amount ?? null,
             'status' => 'pending',
         ]);
 
-        return new BookingResource($booking->load(['customer', 'professional', 'service']));
+        return (new BookingResource($booking->load(['customer', 'professional', 'service'])))
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function updateStatus(Request $request, $id)
@@ -86,7 +109,7 @@ class BookingController extends Controller
             $allowed = true;
         }
 
-        if (!$allowed) {
+        if (! $allowed) {
             return response()->json(['message' => "Invalid status transition from $currentStatus to $newStatus."], 422);
         }
 
