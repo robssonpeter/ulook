@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\BookingResource;
 use App\Models\Booking;
 use App\Models\Professional;
+use App\Models\ProfessionalService;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,7 +16,7 @@ class BookingController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = Booking::with(['customer', 'professional', 'service', 'review']);
+        $query = Booking::with(['customer', 'professional', 'service', 'professionalService', 'review']);
 
         // Check if the route name or path indicates professional dashboard
         if ($request->is('api/professional/*') || $user->role === 'professional') {
@@ -35,12 +36,17 @@ class BookingController extends Controller
 
         $request->validate([
             'professional_id' => 'required',
-            'service_id' => 'required|exists:services,id',
+            'service_id' => 'nullable|exists:services,id',
+            'professional_service_id' => 'nullable|exists:professional_services,id',
             'booking_date' => 'required|date|after_or_equal:today',
             'booking_time' => 'required',
             'total_price' => 'required|numeric|min:0',
             'deposit_amount' => 'nullable|numeric|min:0',
         ]);
+
+        if (! $request->service_id && ! $request->professional_service_id) {
+            return response()->json(['message' => 'Service is required.'], 422);
+        }
 
         $professionalId = $request->professional_id;
         $professionalUser = null;
@@ -70,7 +76,8 @@ class BookingController extends Controller
         $booking = Booking::create([
             'customer_id' => $request->user()->id,
             'professional_id' => $professionalUser->id,
-            'service_id' => $request->service_id,
+            'service_id' => $request->service_id ?? ($request->professional_service_id ? ProfessionalService::find($request->professional_service_id)?->service_id : null),
+            'professional_service_id' => $request->professional_service_id,
             'booking_date' => $request->booking_date,
             'booking_time' => $request->booking_time,
             'total_price' => $request->total_price,
@@ -78,7 +85,7 @@ class BookingController extends Controller
             'status' => 'pending',
         ]);
 
-        return (new BookingResource($booking->load(['customer', 'professional', 'service'])))
+        return (new BookingResource($booking->load(['customer', 'professional', 'service', 'professionalService'])))
             ->response()
             ->setStatusCode(201);
     }

@@ -34,6 +34,7 @@ class BookingResource extends JsonResource
             'user_id' => $this->customer_id,
             'professional_id' => $this->professional_id,
             'service_id' => $this->service_id,
+            'professional_service_id' => $this->professional_service_id,
             'booking_date' => $this->booking_date,
             'booking_time' => $this->booking_time,
             'status' => $this->status,
@@ -42,6 +43,7 @@ class BookingResource extends JsonResource
             'customer' => new UserResource($this->whenLoaded('customer')),
             'professional' => $professionalProfile ? new ProfessionalResource($professionalProfile) : new UserResource($this->whenLoaded('professional')),
             'service' => $serviceData ? new ServiceResource($serviceData) : null,
+            'professional_service' => $this->whenLoaded('professionalService'),
             'review' => new ReviewResource($this->whenLoaded('review')),
             'created_at' => $this->created_at,
         ];

@@ -13,6 +13,7 @@ class Booking extends Model
         'customer_id',
         'professional_id',
         'service_id',
+        'professional_service_id',
         'booking_date',
         'booking_time',
         'status',
@@ -33,6 +34,11 @@ class Booking extends Model
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function professionalService()
+    {
+        return $this->belongsTo(ProfessionalService::class);
     }
 
     public function review()

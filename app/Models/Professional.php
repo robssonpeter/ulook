@@ -13,12 +13,16 @@ class Professional extends Model
         'user_id',
         'bio',
         'location',
+        'latitude',
+        'longitude',
         'price_range',
         'is_verified',
     ];
 
     protected $casts = [
         'is_verified' => 'boolean',
+        'latitude' => 'decimal:8',
+        'longitude' => 'decimal:8',
     ];
 
     public function user()
@@ -26,9 +30,15 @@ class Professional extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function professionalServices()
+    {
+        return $this->hasMany(ProfessionalService::class);
+    }
+
     public function services()
     {
-        return $this->belongsToMany(Service::class)
-            ->withPivot(['description', 'price', 'duration']);
+        return $this->belongsToMany(Service::class, 'professional_services')
+            ->withPivot(['id', 'name', 'description', 'price', 'duration_minutes', 'is_active'])
+            ->withTimestamps();
     }
 }

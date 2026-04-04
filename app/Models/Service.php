@@ -13,6 +13,13 @@ class Service extends Model
 
     public function professionals()
     {
-        return $this->belongsToMany(Professional::class);
+        return $this->belongsToMany(Professional::class, 'professional_services')
+            ->withPivot(['id', 'name', 'description', 'price', 'duration_minutes', 'is_active'])
+            ->withTimestamps();
+    }
+
+    public function professionalServices()
+    {
+        return $this->hasMany(ProfessionalService::class);
     }
 }

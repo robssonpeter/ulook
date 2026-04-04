@@ -3,22 +3,37 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-
 use App\Http\Resources\ProfessionalResource;
 use App\Models\Professional;
+use Illuminate\Http\Request;
 
 class ProfessionalController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $professionals = Professional::with(['user', 'services'])->paginate();
+        $query = Professional::with(['user', 'services']);
+
+        if ($request->has(['lat', 'lng'])) {
+            $lat = (float) $request->lat;
+            $lng = (float) $request->lng;
+
+            // Simple distance calculation using Pythagoras (for small distances)
+            // For more accuracy, use Haversine formula
+            $query->selectRaw(
+                '*, (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))) AS distance',
+                [$lat, $lng, $lat]
+            )->orderBy('distance');
+        }
+
+        $professionals = $query->paginate();
+
         return ProfessionalResource::collection($professionals);
     }
 
     public function show($id)
     {
         $professional = Professional::with(['user', 'services'])->findOrFail($id);
+
         return new ProfessionalResource($professional);
     }
 
@@ -54,28 +69,71 @@ class ProfessionalController extends Controller
         return new ProfessionalResource($professional->load(['user', 'services']));
     }
 
-    public function update(Request $request, $id)
+    public function getServices($id)
     {
         $professional = Professional::findOrFail($id);
 
-        if ($request->user()->id !== $professional->user_id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        return response()->json([
+            'data' => $professional->professionalServices()->with('service')->get(),
+        ]);
+    }
+
+    public function addService(Request $request)
+    {
+        $user = $request->user();
+        $professional = Professional::where('user_id', $user->id)->firstOrFail();
 
         $validated = $request->validate([
-            'bio' => 'nullable|string',
-            'location' => 'nullable|string',
-            'price_range' => 'nullable|string',
-            'services' => 'nullable|array',
-            'services.*' => 'exists:services,id',
+            'service_id' => 'required|exists:services,id',
+            'name' => 'nullable|string',
+            'price' => 'required|numeric|min:0',
+            'duration_minutes' => 'nullable|integer|min:1',
+            'description' => 'nullable|string',
         ]);
 
-        $professional->update($request->only(['bio', 'location', 'price_range']));
+        $professionalService = $professional->professionalServices()->create($validated);
 
-        if ($request->has('services')) {
-            $professional->services()->sync($validated['services']);
-        }
+        return response()->json([
+            'message' => 'Service added to catalog successfully.',
+            'data' => $professionalService->load('service'),
+        ], 201);
+    }
 
-        return new ProfessionalResource($professional->load(['user', 'services']));
+    public function updateService(Request $request, $id)
+    {
+        $user = $request->user();
+        $professional = Professional::where('user_id', $user->id)->firstOrFail();
+        $professionalService = $professional->professionalServices()->findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => 'nullable|string',
+            'price' => 'nullable|numeric|min:0',
+            'duration_minutes' => 'nullable|integer|min:1',
+            'description' => 'nullable|string',
+            'is_active' => 'nullable|boolean',
+        ]);
+
+        $professionalService->update($validated);
+
+        return response()->json([
+            'message' => 'Service updated successfully.',
+            'data' => $professionalService->load('service'),
+        ]);
+    }
+
+    public function toggleService(Request $request, $id)
+    {
+        $user = $request->user();
+        $professional = Professional::where('user_id', $user->id)->firstOrFail();
+        $professionalService = $professional->professionalServices()->findOrFail($id);
+
+        $professionalService->update([
+            'is_active' => ! $professionalService->is_active,
+        ]);
+
+        return response()->json([
+            'message' => 'Service status toggled successfully.',
+            'data' => $professionalService,
+        ]);
     }
 }
