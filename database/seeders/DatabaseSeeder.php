@@ -46,7 +46,15 @@ class DatabaseSeeder extends Seeder
             'is_verified' => true,
         ]);
 
-        $professional->services()->attach($serviceModels->pluck('id')->random(3));
+        $professional->services()->attach(
+            $serviceModels->pluck('id')->random(3)->mapWithKeys(function ($id) {
+                return [$id => [
+                    'description' => 'Personalized service based on your needs.',
+                    'price' => rand(20, 100),
+                    'duration' => [30, 45, 60, 90][rand(0, 3)],
+                ]];
+            })->toArray()
+        );
 
         // Sample customer
         User::create([

@@ -2,7 +2,6 @@
 
 namespace App\Http\Resources;
 
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class ProfessionalResource extends JsonResource
@@ -16,12 +15,14 @@ class ProfessionalResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'user' => new UserResource($this->whenLoaded('user')),
+            'name' => $this->user ? $this->user->name : '',
             'bio' => $this->bio,
             'location' => $this->location,
             'price_range' => $this->price_range,
+            'category' => $this->services->first() ? $this->services->first()->name : 'General',
             'is_verified' => $this->is_verified,
             'services' => ServiceResource::collection($this->whenLoaded('services')),
+            'user' => new UserResource($this->whenLoaded('user')),
             'created_at' => $this->created_at,
         ];
     }
