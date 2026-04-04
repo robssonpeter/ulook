@@ -16,10 +16,11 @@ class BookingController extends Controller
         $user = $request->user();
         $query = Booking::with(['customer', 'professional', 'service', 'review']);
 
-        if ($user->role === 'customer') {
-            $query->where('customer_id', $user->id);
+        // Check if the route name or path indicates professional dashboard
+        if ($request->is('api/professional/*') || $user->role === 'professional') {
+             $query->where('professional_id', $user->id);
         } else {
-            $query->where('professional_id', $user->id);
+             $query->where('customer_id', $user->id);
         }
 
         return BookingResource::collection($query->paginate());
@@ -71,7 +72,25 @@ class BookingController extends Controller
             'status' => ['required', Rule::in(['pending', 'confirmed', 'completed', 'cancelled'])],
         ]);
 
-        $booking->update(['status' => $validated['status']]);
+        $newStatus = $validated['status'];
+        $currentStatus = $booking->status;
+
+        // Validation logic for status transitions
+        $allowed = false;
+
+        if ($newStatus === 'cancelled') {
+            $allowed = true; // Any status can be cancelled
+        } elseif ($currentStatus === 'pending' && $newStatus === 'confirmed') {
+            $allowed = true;
+        } elseif ($currentStatus === 'confirmed' && $newStatus === 'completed') {
+            $allowed = true;
+        }
+
+        if (!$allowed) {
+            return response()->json(['message' => "Invalid status transition from $currentStatus to $newStatus."], 422);
+        }
+
+        $booking->update(['status' => $newStatus]);
 
         return new BookingResource($booking->load(['customer', 'professional', 'service']));
     }

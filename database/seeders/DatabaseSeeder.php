@@ -33,6 +33,7 @@ class DatabaseSeeder extends Seeder
         $professionalUser = User::create([
             'name' => 'John Professional',
             'phone' => '1234567890',
+            'email' => 'professional@example.com',
             'password' => bcrypt('password'),
             'role' => 'professional',
         ]);
@@ -51,6 +52,7 @@ class DatabaseSeeder extends Seeder
         User::create([
             'name' => 'Jane Customer',
             'phone' => '0987654321',
+            'email' => 'customer@example.com',
             'password' => bcrypt('password'),
             'role' => 'customer',
         ]);
