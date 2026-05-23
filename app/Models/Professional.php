@@ -41,4 +41,20 @@ class Professional extends Model
             ->withPivot(['id', 'name', 'description', 'price', 'duration_minutes', 'is_active'])
             ->withTimestamps();
     }
+
+    /**
+     * Reviews received by this professional.
+     * professionals.user_id → bookings.professional_id → reviews.booking_id
+     */
+    public function reviews()
+    {
+        return $this->hasManyThrough(
+            Review::class,
+            Booking::class,
+            'professional_id', // FK on bookings (= professional's user_id)
+            'booking_id',      // FK on reviews
+            'user_id',         // local key on professionals
+            'id'               // local key on bookings
+        );
+    }
 }

@@ -8,6 +8,8 @@ use App\Models\Booking;
 use App\Models\Professional;
 use App\Models\ProfessionalService;
 use App\Models\User;
+use App\Notifications\BookingStatusNotification;
+use App\Notifications\NewBookingNotification;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -18,14 +20,13 @@ class BookingController extends Controller
         $user = $request->user();
         $query = Booking::with(['customer', 'professional', 'service', 'professionalService', 'review']);
 
-        // Check if the route name or path indicates professional dashboard
         if ($request->is('api/professional/*') || $user->role === 'professional') {
             $query->where('professional_id', $user->id);
         } else {
             $query->where('customer_id', $user->id);
         }
 
-        return BookingResource::collection($query->paginate());
+        return BookingResource::collection($query->latest()->paginate());
     }
 
     public function store(Request $request)
@@ -35,13 +36,13 @@ class BookingController extends Controller
         }
 
         $request->validate([
-            'professional_id' => 'required',
-            'service_id' => 'nullable|exists:services,id',
+            'professional_id'       => 'required',
+            'service_id'            => 'nullable|exists:services,id',
             'professional_service_id' => 'nullable|exists:professional_services,id',
-            'booking_date' => 'required|date|after_or_equal:today',
-            'booking_time' => 'required',
-            'total_price' => 'required|numeric|min:0',
-            'deposit_amount' => 'nullable|numeric|min:0',
+            'booking_date'          => 'required|date|after_or_equal:today',
+            'booking_time'          => 'required',
+            'total_price'           => 'required|numeric|min:0',
+            'deposit_amount'        => 'nullable|numeric|min:0',
         ]);
 
         if (! $request->service_id && ! $request->professional_service_id) {
@@ -49,52 +50,53 @@ class BookingController extends Controller
         }
 
         $professionalId = $request->professional_id;
-        $professionalUser = null;
 
-        // Try to find by user_id first (original behavior)
-        $professionalUser = User::where('id', $professionalId)
-            ->where('role', 'professional')
-            ->first();
+        $professionalUser = User::where('id', $professionalId)->where('role', 'professional')->first();
 
-        // If not found, try to find by professional profile ID (mobile app behavior)
         if (! $professionalUser) {
             $professional = Professional::find($professionalId);
             if ($professional) {
-                $professionalUser = User::where('id', $professional->user_id)
-                    ->where('role', 'professional')
-                    ->first();
+                $professionalUser = User::where('id', $professional->user_id)->where('role', 'professional')->first();
             }
         }
 
         if (! $professionalUser) {
             return response()->json([
                 'message' => 'The selected professional is invalid.',
-                'errors' => ['professional_id' => ['The selected professional is invalid.']],
+                'errors'  => ['professional_id' => ['The selected professional is invalid.']],
             ], 422);
         }
 
         $booking = Booking::create([
-            'customer_id' => $request->user()->id,
-            'professional_id' => $professionalUser->id,
-            'service_id' => $request->service_id ?? ($request->professional_service_id ? ProfessionalService::find($request->professional_service_id)?->service_id : null),
+            'customer_id'           => $request->user()->id,
+            'professional_id'       => $professionalUser->id,
+            'service_id'            => $request->service_id ?? ($request->professional_service_id ? ProfessionalService::find($request->professional_service_id)?->service_id : null),
             'professional_service_id' => $request->professional_service_id,
-            'booking_date' => $request->booking_date,
-            'booking_time' => $request->booking_time,
-            'total_price' => $request->total_price,
-            'deposit_amount' => $request->deposit_amount ?? null,
-            'status' => 'pending',
+            'booking_date'          => $request->booking_date,
+            'booking_time'          => $request->booking_time,
+            'total_price'           => $request->total_price,
+            'deposit_amount'        => $request->deposit_amount ?? null,
+            'status'                => 'pending',
         ]);
 
-        return (new BookingResource($booking->load(['customer', 'professional', 'service', 'professionalService'])))
-            ->response()
-            ->setStatusCode(201);
+        $booking->load(['customer', 'professional', 'service', 'professionalService']);
+
+        // Notify professional of new booking
+        if ($professionalUser->email) {
+            try {
+                $professionalUser->notify(new NewBookingNotification($booking));
+            } catch (\Exception $e) {
+                // Non-fatal: log but don't fail the request
+            }
+        }
+
+        return (new BookingResource($booking))->response()->setStatusCode(201);
     }
 
     public function updateStatus(Request $request, $id)
     {
         $user = $request->user();
 
-        // Customers can cancel their own pending bookings
         if ($user->role === 'customer') {
             $booking = Booking::where('customer_id', $user->id)->findOrFail($id);
 
@@ -102,11 +104,19 @@ class BookingController extends Controller
                 return response()->json(['message' => 'You can only cancel pending bookings.'], 422);
             }
 
-            $request->validate([
-                'status' => ['required', Rule::in(['cancelled'])],
-            ]);
+            $request->validate(['status' => ['required', Rule::in(['cancelled'])]]);
 
+            $currentStatus = $booking->status;
             $booking->update(['status' => 'cancelled']);
+
+            // Notify customer of their own cancellation confirmation
+            if ($user->email) {
+                try {
+                    $user->notify(new BookingStatusNotification($booking->load(['professionalService', 'service']), $currentStatus));
+                } catch (\Exception $e) {
+                    // Non-fatal
+                }
+            }
 
             return new BookingResource($booking->load(['customer', 'professional', 'service']));
         }
@@ -121,14 +131,12 @@ class BookingController extends Controller
             'status' => ['required', Rule::in(['pending', 'confirmed', 'completed', 'cancelled'])],
         ]);
 
-        $newStatus = $validated['status'];
+        $newStatus     = $validated['status'];
         $currentStatus = $booking->status;
 
-        // Validation logic for status transitions
         $allowed = false;
-
         if ($newStatus === 'cancelled') {
-            $allowed = true; // Any status can be cancelled
+            $allowed = true;
         } elseif ($currentStatus === 'pending' && $newStatus === 'confirmed') {
             $allowed = true;
         } elseif ($currentStatus === 'confirmed' && $newStatus === 'completed') {
@@ -136,10 +144,20 @@ class BookingController extends Controller
         }
 
         if (! $allowed) {
-            return response()->json(['message' => "Invalid status transition from $currentStatus to $newStatus."], 422);
+            return response()->json(['message' => "Invalid status transition from {$currentStatus} to {$newStatus}."], 422);
         }
 
         $booking->update(['status' => $newStatus]);
+
+        // Notify the customer of the status change
+        $customer = User::find($booking->customer_id);
+        if ($customer?->email) {
+            try {
+                $customer->notify(new BookingStatusNotification($booking->load(['professionalService', 'service']), $currentStatus));
+            } catch (\Exception $e) {
+                // Non-fatal
+            }
+        }
 
         return new BookingResource($booking->load(['customer', 'professional', 'service']));
     }
