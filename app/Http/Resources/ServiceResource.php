@@ -15,11 +15,11 @@ class ServiceResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'professional_id' => $this->pivot ? $this->pivot->professional_id : null,
-            'name' => $this->name,
+            'professional_id' => $this->pivot ? (int) $this->pivot->professional_id : null,
+            'name' => $this->pivot?->name ?? $this->name,
             'description' => $this->pivot ? $this->pivot->description : '',
             'price' => $this->pivot ? (float) $this->pivot->price : 0.0,
-            'duration' => $this->pivot ? (int) $this->pivot->duration : 0,
+            'duration' => $this->pivot ? (int) $this->pivot->duration_minutes : 0,
         ];
     }
 }

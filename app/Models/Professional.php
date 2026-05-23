@@ -38,7 +38,7 @@ class Professional extends Model
     public function services()
     {
         return $this->belongsToMany(Service::class, 'professional_services')
-            ->withPivot(['id', 'name', 'description', 'price', 'duration_minutes', 'is_active'])
+            ->withPivot(['id', 'name', 'description', 'price', 'duration_minutes', 'is_active', 'professional_id'])
             ->withTimestamps();
     }
 
