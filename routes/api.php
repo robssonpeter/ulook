@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookingController;
+use App\Http\Controllers\Api\ExpenseController;
+use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\ProfilePhotoController;
 use App\Http\Controllers\Api\ProfessionalController;
 use App\Http\Controllers\Api\ReviewController;
@@ -42,4 +44,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/bookings/{id}/status', [BookingController::class, 'updateStatus']);
 
     Route::post('/reviews', [ReviewController::class, 'store']);
+
+    // Expenses
+    Route::get('/professional/expenses', [ExpenseController::class, 'index']);
+    Route::get('/professional/expenses/summary', [ExpenseController::class, 'summary']);
+    Route::post('/professional/expenses', [ExpenseController::class, 'store']);
+    Route::put('/professional/expenses/{id}', [ExpenseController::class, 'update']);
+    Route::delete('/professional/expenses/{id}', [ExpenseController::class, 'destroy']);
+
+    // Inventory
+    Route::get('/professional/inventory', [InventoryController::class, 'index']);
+    Route::get('/professional/inventory/low-stock', [InventoryController::class, 'lowStock']);
+    Route::post('/professional/inventory', [InventoryController::class, 'store']);
+    Route::put('/professional/inventory/{id}', [InventoryController::class, 'update']);
+    Route::delete('/professional/inventory/{id}', [InventoryController::class, 'destroy']);
+    Route::patch('/professional/inventory/{id}/adjust', [InventoryController::class, 'adjust']);
 });
