@@ -92,11 +92,30 @@ class BookingController extends Controller
 
     public function updateStatus(Request $request, $id)
     {
-        if ($request->user()->role !== 'professional') {
-            return response()->json(['message' => 'Only professionals can update booking status.'], 403);
+        $user = $request->user();
+
+        // Customers can cancel their own pending bookings
+        if ($user->role === 'customer') {
+            $booking = Booking::where('customer_id', $user->id)->findOrFail($id);
+
+            if ($booking->status !== 'pending') {
+                return response()->json(['message' => 'You can only cancel pending bookings.'], 422);
+            }
+
+            $request->validate([
+                'status' => ['required', Rule::in(['cancelled'])],
+            ]);
+
+            $booking->update(['status' => 'cancelled']);
+
+            return new BookingResource($booking->load(['customer', 'professional', 'service']));
         }
 
-        $booking = Booking::where('professional_id', $request->user()->id)->findOrFail($id);
+        if ($user->role !== 'professional') {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
+        $booking = Booking::where('professional_id', $user->id)->findOrFail($id);
 
         $validated = $request->validate([
             'status' => ['required', Rule::in(['pending', 'confirmed', 'completed', 'cancelled'])],

@@ -52,6 +52,8 @@ class ProfessionalController extends Controller
             'price_range' => 'nullable|string',
             'services' => 'required|array',
             'services.*' => 'exists:services,id',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
         ]);
 
         $professional = Professional::create([
@@ -59,6 +61,8 @@ class ProfessionalController extends Controller
             'bio' => $validated['bio'],
             'location' => $validated['location'],
             'price_range' => $validated['price_range'],
+            'latitude' => $validated['latitude'] ?? null,
+            'longitude' => $validated['longitude'] ?? null,
         ]);
 
         $professional->services()->attach($validated['services']);
@@ -67,6 +71,16 @@ class ProfessionalController extends Controller
         $user->update(['role' => 'professional']);
 
         return new ProfessionalResource($professional->load(['user', 'services']));
+    }
+
+    public function myProfile(Request $request)
+    {
+        $user = $request->user();
+        $professional = Professional::with(['user', 'services', 'professionalServices.service'])
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        return new ProfessionalResource($professional);
     }
 
     public function getServices($id)

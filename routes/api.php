@@ -25,6 +25,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::post('/professionals', [ProfessionalController::class, 'store']);
+    Route::get('/professional/profile', [ProfessionalController::class, 'myProfile']);
     Route::get('/professionals/{id}/services', [ProfessionalController::class, 'getServices']);
     Route::post('/professional/services', [ProfessionalController::class, 'addService']);
     Route::patch('/professional/services/{id}', [ProfessionalController::class, 'updateService']);
