@@ -17,6 +17,10 @@ class Booking extends Model
         'booking_date',
         'booking_time',
         'status',
+        'type',
+        'customer_address',
+        'customer_latitude',
+        'customer_longitude',
         'total_price',
         'deposit_amount',
     ];

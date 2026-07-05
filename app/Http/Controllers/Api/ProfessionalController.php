@@ -53,7 +53,17 @@ class ProfessionalController extends Controller
             });
         }
 
-        $professionals = $query->paginate();
+        if ($request->filled('q')) {
+            $search = '%' . $request->q . '%';
+            $query->where(function ($q) use ($search) {
+                $q->where('bio', 'like', $search)
+                  ->orWhere('location', 'like', $search)
+                  ->orWhereHas('user', fn ($uq) => $uq->where('name', 'like', $search))
+                  ->orWhereHas('services', fn ($sq) => $sq->where('name', 'like', $search));
+            });
+        }
+
+        $professionals = $query->paginate(20);
 
         return ProfessionalResource::collection($professionals);
     }

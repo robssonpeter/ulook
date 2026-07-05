@@ -36,14 +36,25 @@ class BookingController extends Controller
         }
 
         $request->validate([
-            'professional_id'       => 'required',
-            'service_id'            => 'nullable|exists:services,id',
+            'professional_id'         => 'required',
+            'service_id'              => 'nullable|exists:services,id',
             'professional_service_id' => 'nullable|exists:professional_services,id',
-            'booking_date'          => 'required|date|after_or_equal:today',
-            'booking_time'          => 'required',
-            'total_price'           => 'required|numeric|min:0',
-            'deposit_amount'        => 'nullable|numeric|min:0',
+            'booking_date'            => 'required|date|after_or_equal:today',
+            'booking_time'            => 'required',
+            'total_price'             => 'required|numeric|min:0',
+            'deposit_amount'          => 'nullable|numeric|min:0',
+            'type'                    => 'nullable|in:booking,request',
+            'customer_address'        => 'nullable|string|max:500',
+            'customer_latitude'       => 'nullable|numeric|between:-90,90',
+            'customer_longitude'      => 'nullable|numeric|between:-180,180',
         ]);
+
+        if ($request->input('type') === 'request' && empty($request->customer_address)) {
+            return response()->json([
+                'message' => 'Customer address is required for home service requests.',
+                'errors'  => ['customer_address' => ['Address is required for home service requests.']],
+            ], 422);
+        }
 
         if (! $request->service_id && ! $request->professional_service_id) {
             return response()->json(['message' => 'Service is required.'], 422);
@@ -68,15 +79,19 @@ class BookingController extends Controller
         }
 
         $booking = Booking::create([
-            'customer_id'           => $request->user()->id,
-            'professional_id'       => $professionalUser->id,
-            'service_id'            => $request->service_id ?? ($request->professional_service_id ? ProfessionalService::find($request->professional_service_id)?->service_id : null),
+            'customer_id'             => $request->user()->id,
+            'professional_id'         => $professionalUser->id,
+            'service_id'              => $request->service_id ?? ($request->professional_service_id ? ProfessionalService::find($request->professional_service_id)?->service_id : null),
             'professional_service_id' => $request->professional_service_id,
-            'booking_date'          => $request->booking_date,
-            'booking_time'          => $request->booking_time,
-            'total_price'           => $request->total_price,
-            'deposit_amount'        => $request->deposit_amount ?? null,
-            'status'                => 'pending',
+            'booking_date'            => $request->booking_date,
+            'booking_time'            => $request->booking_time,
+            'total_price'             => $request->total_price,
+            'deposit_amount'          => $request->deposit_amount ?? null,
+            'status'                  => 'pending',
+            'type'                    => $request->input('type', 'booking'),
+            'customer_address'        => $request->customer_address,
+            'customer_latitude'       => $request->customer_latitude,
+            'customer_longitude'      => $request->customer_longitude,
         ]);
 
         $booking->load(['customer', 'professional', 'service', 'professionalService']);
