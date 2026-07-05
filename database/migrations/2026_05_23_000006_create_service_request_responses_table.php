@@ -18,7 +18,7 @@ return new class extends Migration
             $table->timestamps();
 
             // A professional can only respond once per request
-            $table->unique(['service_request_id', 'professional_id']);
+            $table->unique(['service_request_id', 'professional_id'], 'srr_request_professional_unique');
         });
     }
 
