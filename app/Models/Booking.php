@@ -18,6 +18,7 @@ class Booking extends Model
         'booking_time',
         'status',
         'type',
+        'venue_type',
         'customer_address',
         'customer_latitude',
         'customer_longitude',

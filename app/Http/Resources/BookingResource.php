@@ -39,6 +39,7 @@ class BookingResource extends JsonResource
             'booking_time' => $this->booking_time,
             'status' => $this->status,
             'type' => $this->type ?? 'booking',
+            'venue_type' => $this->venue_type,
             'customer_address' => $this->customer_address,
             'customer_latitude' => $this->customer_latitude,
             'customer_longitude' => $this->customer_longitude,

@@ -7,11 +7,15 @@ use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\FollowController;
 use App\Http\Controllers\Api\ProfilePhotoController;
 use App\Http\Controllers\Api\ProfessionalController;
+use App\Http\Controllers\Api\ProfessionalPostController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\ServiceController;
 use App\Http\Controllers\Api\ServiceRequestController;
+use App\Http\Controllers\Api\PortfolioController;
+use App\Http\Controllers\Api\UserController;
 use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +26,7 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::get('/professionals', [ProfessionalController::class, 'index']);
 Route::get('/professionals/{id}', [ProfessionalController::class, 'show']);
 Route::get('/professionals/{id}/reviews', [ReviewController::class, 'indexForProfessional']);
+Route::get('/professionals/{id}/portfolio', [PortfolioController::class, 'index']);
 
 Route::get('/services', [ServiceController::class, 'index']);
 
@@ -31,6 +36,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::put('/user/profile', [UserController::class, 'update']);
     Route::post('/user/fcm-token', [FcmTokenController::class, 'store']);
     Route::post('/user/profile-photo', [ProfilePhotoController::class, 'update']);
     Route::post('/professional/profile-photo', [ProfilePhotoController::class, 'update']);
@@ -43,6 +49,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/professional/services/{id}', [ProfessionalController::class, 'updateService']);
     Route::patch('/professional/services/{id}/toggle', [ProfessionalController::class, 'toggleService']);
     Route::delete('/professional/services/{id}', [ProfessionalController::class, 'deleteService']);
+    Route::get('/professional/working-hours', [ProfessionalController::class, 'getWorkingHours']);
+    Route::put('/professional/working-hours', [ProfessionalController::class, 'saveWorkingHours']);
+    Route::post('/professional/verify-request', [ProfessionalController::class, 'requestVerification']);
     Route::get('/professional/bookings', [BookingController::class, 'index']);
 
     Route::get('/bookings', [BookingController::class, 'index']);
@@ -50,6 +59,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/bookings/{id}/status', [BookingController::class, 'updateStatus']);
 
     Route::post('/reviews', [ReviewController::class, 'store']);
+
+    // Follows + activity feed (customer)
+    Route::post('/professionals/{id}/follow', [FollowController::class, 'follow']);
+    Route::delete('/professionals/{id}/follow', [FollowController::class, 'unfollow']);
+    Route::get('/followed', [FollowController::class, 'followed']);
+    Route::get('/followed/feed', [FollowController::class, 'feed']);
+
+    // Activity posts authored by a professional (business app)
+    Route::get('/professional/posts', [ProfessionalPostController::class, 'index']);
+    Route::post('/professional/posts', [ProfessionalPostController::class, 'store']);
+    Route::delete('/professional/posts/{id}', [ProfessionalPostController::class, 'destroy']);
 
     // Expenses
     Route::get('/professional/expenses', [ExpenseController::class, 'index']);
@@ -79,6 +99,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::patch('/notifications/{id}/read', [NotificationController::class, 'markRead']);
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead']);
+
+    // Portfolio photos
+    Route::get('/professional/portfolio', [PortfolioController::class, 'myPortfolio']);
+    Route::post('/professional/portfolio', [PortfolioController::class, 'store']);
+    Route::delete('/professional/portfolio/{id}', [PortfolioController::class, 'destroy']);
+    Route::put('/professional/portfolio/reorder', [PortfolioController::class, 'reorder']);
 
     // Messages / chat
     Route::get('/messages/conversations', [MessageController::class, 'conversations']);

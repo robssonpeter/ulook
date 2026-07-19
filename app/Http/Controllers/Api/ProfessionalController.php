@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProfessionalResource;
 use App\Models\Professional;
+use App\Models\ProfessionalWorkingHours;
 use Illuminate\Http\Request;
 
 class ProfessionalController extends Controller
@@ -63,6 +64,24 @@ class ProfessionalController extends Controller
             });
         }
 
+        if ($request->filled('min_rating')) {
+            $query->havingRaw('COALESCE(reviews_avg_rating, 0) >= ?', [(float) $request->min_rating]);
+        }
+
+        if ($request->filled('available_day')) {
+            $query->whereHas('workingHours', function ($q) use ($request) {
+                $q->where('day_of_week', (int) $request->available_day)
+                  ->where('is_closed', false);
+                if ($request->filled('available_time')) {
+                    $q->whereRaw('? BETWEEN open_time AND close_time', [$request->available_time]);
+                }
+            });
+        }
+
+        if ($request->filled('sort_by') && $request->sort_by === 'rating') {
+            $query->orderByDesc('reviews_avg_rating');
+        }
+
         $professionals = $query->paginate(20);
 
         return ProfessionalResource::collection($professionals);
@@ -70,10 +89,18 @@ class ProfessionalController extends Controller
 
     public function show($id)
     {
-        $professional = Professional::with(['user', 'services', 'professionalServices.service'])
+        $professional = Professional::with(['user', 'services', 'professionalServices.service', 'workingHours', 'portfolioPhotos'])
             ->withAvg('reviews', 'rating')
-            ->withCount('reviews')
+            ->withCount(['reviews', 'followers'])
             ->findOrFail($id);
+
+        // Resolve the bearer token (this route is public, so no auth middleware).
+        $viewer = auth('sanctum')->user();
+        $professional->is_following = $viewer
+            ? $professional->followers()->where('user_id', $viewer->id)->exists()
+            : false;
+
+        $professional->load(['posts' => fn ($q) => $q->latest()->limit(6)]);
 
         return new ProfessionalResource($professional);
     }
@@ -87,22 +114,24 @@ class ProfessionalController extends Controller
         }
 
         $validated = $request->validate([
-            'bio'         => 'nullable|string',
-            'location'    => 'required|string',
-            'price_range' => 'nullable|string',
-            'services'    => 'required|array',
-            'services.*'  => 'exists:services,id',
-            'latitude'    => 'nullable|numeric|between:-90,90',
-            'longitude'   => 'nullable|numeric|between:-180,180',
+            'bio'              => 'nullable|string',
+            'location'         => 'required|string',
+            'price_range'      => 'nullable|string',
+            'years_experience' => 'nullable|integer|min:0|max:60',
+            'services'         => 'required|array',
+            'services.*'       => 'exists:services,id',
+            'latitude'         => 'nullable|numeric|between:-90,90',
+            'longitude'        => 'nullable|numeric|between:-180,180',
         ]);
 
         $professional = Professional::create([
-            'user_id'     => $user->id,
-            'bio'         => $validated['bio'] ?? null,
-            'location'    => $validated['location'],
-            'price_range' => $validated['price_range'] ?? null,
-            'latitude'    => $validated['latitude'] ?? null,
-            'longitude'   => $validated['longitude'] ?? null,
+            'user_id'          => $user->id,
+            'bio'              => $validated['bio'] ?? null,
+            'location'         => $validated['location'],
+            'price_range'      => $validated['price_range'] ?? null,
+            'years_experience' => $validated['years_experience'] ?? null,
+            'latitude'         => $validated['latitude'] ?? null,
+            'longitude'        => $validated['longitude'] ?? null,
         ]);
 
         $professional->services()->attach($validated['services']);
@@ -119,7 +148,7 @@ class ProfessionalController extends Controller
     public function myProfile(Request $request)
     {
         $user = $request->user();
-        $professional = Professional::with(['user', 'services', 'professionalServices.service'])
+        $professional = Professional::with(['user', 'services', 'professionalServices.service', 'workingHours'])
             ->withAvg('reviews', 'rating')
             ->withCount('reviews')
             ->where('user_id', $user->id)
@@ -128,17 +157,67 @@ class ProfessionalController extends Controller
         return new ProfessionalResource($professional);
     }
 
+    public function getWorkingHours(Request $request)
+    {
+        $professional = Professional::where('user_id', $request->user()->id)->firstOrFail();
+        return response()->json(['data' => $professional->workingHours]);
+    }
+
+    public function saveWorkingHours(Request $request)
+    {
+        $request->validate([
+            'hours'               => 'required|array',
+            'hours.*.day_of_week' => 'required|integer|between:0,6',
+            'hours.*.open_time'   => 'nullable|date_format:H:i',
+            'hours.*.close_time'  => 'nullable|date_format:H:i',
+            'hours.*.is_closed'   => 'required|boolean',
+        ]);
+
+        $professional = Professional::where('user_id', $request->user()->id)->firstOrFail();
+
+        foreach ($request->hours as $hour) {
+            ProfessionalWorkingHours::updateOrCreate(
+                ['professional_id' => $professional->id, 'day_of_week' => $hour['day_of_week']],
+                [
+                    'open_time'  => $hour['is_closed'] ? null : ($hour['open_time'] ?? null),
+                    'close_time' => $hour['is_closed'] ? null : ($hour['close_time'] ?? null),
+                    'is_closed'  => $hour['is_closed'],
+                ]
+            );
+        }
+
+        return response()->json(['data' => $professional->workingHours()->orderBy('day_of_week')->get()]);
+    }
+
+    public function requestVerification(Request $request)
+    {
+        $professional = Professional::where('user_id', $request->user()->id)->firstOrFail();
+
+        if ($professional->is_verified) {
+            return response()->json(['message' => 'Already verified.'], 400);
+        }
+
+        if ($professional->verification_status === 'pending') {
+            return response()->json(['message' => 'Verification request already submitted.'], 400);
+        }
+
+        $professional->update(['verification_status' => 'pending']);
+
+        return response()->json(['message' => 'Verification request submitted successfully.', 'data' => new ProfessionalResource($professional->load(['user', 'services']))]);
+    }
+
     public function updateProfile(Request $request)
     {
         $user = $request->user();
         $professional = Professional::where('user_id', $user->id)->firstOrFail();
 
         $validated = $request->validate([
-            'bio'         => 'nullable|string',
-            'location'    => 'required|string',
-            'price_range' => 'nullable|string',
-            'latitude'    => 'nullable|numeric|between:-90,90',
-            'longitude'   => 'nullable|numeric|between:-180,180',
+            'bio'              => 'nullable|string',
+            'location'         => 'required|string',
+            'price_range'      => 'nullable|string',
+            'years_experience' => 'nullable|integer|min:0|max:60',
+            'latitude'         => 'nullable|numeric|between:-90,90',
+            'longitude'        => 'nullable|numeric|between:-180,180',
         ]);
 
         $professional->update($validated);

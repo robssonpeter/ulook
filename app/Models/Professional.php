@@ -16,7 +16,9 @@ class Professional extends Model
         'latitude',
         'longitude',
         'price_range',
+        'years_experience',
         'is_verified',
+        'verification_status',
     ];
 
     protected $casts = [
@@ -33,6 +35,26 @@ class Professional extends Model
     public function professionalServices()
     {
         return $this->hasMany(ProfessionalService::class);
+    }
+
+    public function followers()
+    {
+        return $this->hasMany(Follow::class);
+    }
+
+    public function posts()
+    {
+        return $this->hasMany(ProfessionalPost::class);
+    }
+
+    public function workingHours()
+    {
+        return $this->hasMany(ProfessionalWorkingHours::class)->orderBy('day_of_week');
+    }
+
+    public function portfolioPhotos()
+    {
+        return $this->hasMany(PortfolioPhoto::class)->orderBy('sort_order');
     }
 
     public function services()
