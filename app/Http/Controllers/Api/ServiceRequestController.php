@@ -84,20 +84,20 @@ class ServiceRequestController extends Controller
 
         $response = $serviceRequest->responses()->findOrFail($responseId);
 
-        // Create the booking
-        $booking = Booking::create([
-            'customer_id'      => $request->user()->id,
-            'professional_id'  => $response->professional->user_id,
-            'service_id'       => $serviceRequest->service_id,
-            'booking_date'     => $serviceRequest->requested_date->format('Y-m-d'),
-            'booking_time'     => $serviceRequest->requested_time,
-            'total_price'      => $response->price_offered,
-            'status'           => 'confirmed',
-            'type'             => 'request',
-            'customer_address' => $serviceRequest->customer_address,
+        // Create the booking (service_id is optional — requests don't require a specific service)
+        $booking = Booking::create(array_filter([
+            'customer_id'        => $request->user()->id,
+            'professional_id'    => $response->professional->user_id,
+            'service_id'         => $serviceRequest->service_id,
+            'booking_date'       => $serviceRequest->requested_date->format('Y-m-d'),
+            'booking_time'       => $serviceRequest->requested_time,
+            'total_price'        => $response->price_offered,
+            'status'             => 'confirmed',
+            'type'               => 'request',
+            'customer_address'   => $serviceRequest->customer_address,
             'customer_latitude'  => $serviceRequest->customer_latitude,
             'customer_longitude' => $serviceRequest->customer_longitude,
-        ]);
+        ], fn ($v) => $v !== null));
 
         // Mark this response accepted, others rejected
         $serviceRequest->responses()
