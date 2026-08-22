@@ -26,7 +26,7 @@ class DatabaseSeeder extends Seeder
         ];
 
         $serviceModels = collect($services)->map(function ($service) {
-            return Service::create(['name' => $service]);
+            return Service::firstOrCreate(['name' => $service]);
         });
 
         // Sample professional
