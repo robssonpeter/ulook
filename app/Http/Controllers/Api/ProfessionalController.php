@@ -59,7 +59,6 @@ class ProfessionalController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('bio', 'like', $search)
                   ->orWhere('location', 'like', $search)
-                  ->orWhere('category', 'like', $search)
                   ->orWhereHas('user', fn ($uq) => $uq->where('name', 'like', $search))
                   ->orWhereHas('services', fn ($sq) => $sq->where('name', 'like', $search));
             });
