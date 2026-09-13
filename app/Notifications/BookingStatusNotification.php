@@ -36,11 +36,11 @@ class BookingStatusNotification extends Notification
         $message = $lines[$this->booking->status] ?? "Your booking status has been updated to: {$newStatus}.";
 
         return (new MailMessage)
-            ->subject("Booking {$newStatus} — ULOOK")
+            ->subject("Booking {$newStatus} — YULUK")
             ->greeting("Hello {$notifiable->name},")
             ->line($message)
             ->line("**Service:** {$service}")
             ->line("**Date:** {$date} at {$time}")
-            ->salutation('The ULOOK Team');
+            ->salutation('The YULUK Team');
     }
 }

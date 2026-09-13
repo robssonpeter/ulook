@@ -28,12 +28,12 @@ class NewBookingNotification extends Notification
         $time = $this->booking->booking_time;
 
         return (new MailMessage)
-            ->subject('New Booking Request — ULOOK')
+            ->subject('New Booking Request — YULUK')
             ->greeting("Hello {$notifiable->name},")
             ->line("{$customerName} has requested a booking with you.")
             ->line("**Service:** {$service}")
             ->line("**Date:** {$date} at {$time}")
-            ->line('Log in to your ULOOK Business app to accept or decline.')
-            ->salutation('The ULOOK Team');
+            ->line('Log in to your YULUK Business app to accept or decline.')
+            ->salutation('The YULUK Team');
     }
 }

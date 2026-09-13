@@ -32,12 +32,12 @@ class BookingReminderNotification extends Notification
         $time = $this->booking->booking_time;
 
         return (new MailMessage)
-            ->subject("Reminder: Your ULOOK appointment is {$when}")
+            ->subject("Reminder: Your YULUK appointment is {$when}")
             ->greeting("Hello {$notifiable->name},")
             ->line("This is a reminder that your appointment for **{$service}** is {$when}.")
             ->line("**Date:** {$date} at {$time}")
             ->line('We look forward to seeing you!')
-            ->salutation('The ULOOK Team');
+            ->salutation('The YULUK Team');
     }
 
     public function toArray($notifiable): array
