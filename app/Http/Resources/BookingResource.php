@@ -38,6 +38,13 @@ class BookingResource extends JsonResource
             'booking_date' => $this->booking_date,
             'booking_time' => $this->booking_time,
             'status' => $this->status,
+            // Only the customer sees the code; they read it out to the
+            // professional as proof the service was delivered.
+            'completion_code' => $request->user()?->id === $this->customer_id
+                && in_array($this->status, ['pending', 'confirmed'], true)
+                ? $this->completion_code
+                : null,
+            'completed_at' => $this->completed_at,
             'type' => $this->type ?? 'booking',
             'venue_type' => $this->venue_type,
             'customer_address' => $this->customer_address,

@@ -145,7 +145,8 @@ class BookingController extends Controller
         $booking = Booking::where('professional_id', $user->id)->findOrFail($id);
 
         $validated = $request->validate([
-            'status' => ['required', Rule::in(['pending', 'confirmed', 'completed', 'cancelled'])],
+            'status'          => ['required', Rule::in(['pending', 'confirmed', 'completed', 'cancelled'])],
+            'completion_code' => ['nullable', 'string'],
         ]);
 
         $newStatus     = $validated['status'];
@@ -164,7 +165,20 @@ class BookingController extends Controller
             return response()->json(['message' => "Invalid status transition from {$currentStatus} to {$newStatus}."], 422);
         }
 
-        $booking->update(['status' => $newStatus]);
+        if ($newStatus === 'completed') {
+            // Proof of delivery: the professional must enter the code shown
+            // to the customer in their app.
+            if ($booking->completion_code
+                && ! hash_equals($booking->completion_code, trim((string) $request->input('completion_code')))) {
+                return response()->json([
+                    'message' => 'Incorrect completion code. Ask the customer for the 4-digit code shown in their app.',
+                    'errors'  => ['completion_code' => ['Incorrect completion code.']],
+                ], 422);
+            }
+            $booking->update(['status' => 'completed', 'completed_at' => now()]);
+        } else {
+            $booking->update(['status' => $newStatus]);
+        }
 
         // Notify the customer of the status change
         $customer = User::find($booking->customer_id);

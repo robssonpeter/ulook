@@ -17,6 +17,8 @@ class Booking extends Model
         'booking_date',
         'booking_time',
         'status',
+        'completion_code',
+        'completed_at',
         'type',
         'venue_type',
         'customer_address',
@@ -25,6 +27,24 @@ class Booking extends Model
         'total_price',
         'deposit_amount',
     ];
+
+    protected $casts = [
+        'completed_at' => 'datetime',
+    ];
+
+    protected $hidden = ['completion_code'];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Booking $booking) {
+            $booking->completion_code ??= self::generateCompletionCode();
+        });
+    }
+
+    public static function generateCompletionCode(): string
+    {
+        return str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+    }
 
     public function customer()
     {

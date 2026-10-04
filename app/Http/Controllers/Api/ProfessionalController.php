@@ -42,20 +42,26 @@ class ProfessionalController extends Controller
             });
         }
 
-        if ($request->filled('min_price')) {
+        if ($request->filled('min_price') || $request->filled('max_price')) {
+            // A single service must fall inside the whole range.
             $query->whereHas('professionalServices', function ($q) use ($request) {
-                $q->where('price', '>=', (float) $request->min_price)->where('is_active', true);
+                $q->where('is_active', true);
+                if ($request->filled('min_price')) {
+                    $q->where('price', '>=', (float) $request->min_price);
+                }
+                if ($request->filled('max_price')) {
+                    $q->where('price', '<=', (float) $request->max_price);
+                }
             });
         }
 
-        if ($request->filled('max_price')) {
-            $query->whereHas('professionalServices', function ($q) use ($request) {
-                $q->where('price', '<=', (float) $request->max_price)->where('is_active', true);
-            });
-        }
-
-        if ($request->filled('q')) {
-            $search = '%' . $request->q . '%';
+        // `q` is the category keyword; `search` is free text typed by the
+        // customer. Both must match when both are given.
+        foreach (['q', 'search'] as $param) {
+            if (! $request->filled($param)) {
+                continue;
+            }
+            $search = '%' . $request->input($param) . '%';
             $query->where(function ($q) use ($search) {
                 $q->where('bio', 'like', $search)
                   ->orWhere('location', 'like', $search)
