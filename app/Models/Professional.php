@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Professional extends Model
 {
@@ -11,6 +12,7 @@ class Professional extends Model
 
     protected $fillable = [
         'user_id',
+        'passport_id',
         'bio',
         'location',
         'latitude',
@@ -26,6 +28,13 @@ class Professional extends Model
         'latitude' => 'decimal:8',
         'longitude' => 'decimal:8',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Professional $professional) {
+            $professional->passport_id ??= (string) Str::uuid();
+        });
+    }
 
     public function user()
     {
@@ -55,6 +64,21 @@ class Professional extends Model
     public function portfolioPhotos()
     {
         return $this->hasMany(PortfolioPhoto::class)->orderBy('sort_order');
+    }
+
+    public function skills()
+    {
+        return $this->hasMany(ProfessionalSkill::class)->orderBy('name');
+    }
+
+    public function certifications()
+    {
+        return $this->hasMany(ProfessionalCertification::class)->latest('issued_on');
+    }
+
+    public function workplaces()
+    {
+        return $this->hasMany(ProfessionalWorkplace::class)->orderByDesc('started_on');
     }
 
     public function services()

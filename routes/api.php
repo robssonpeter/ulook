@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\MessageController;
+use App\Http\Controllers\Api\PassportController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\FollowController;
 use App\Http\Controllers\Api\ProfilePhotoController;
@@ -27,6 +28,8 @@ Route::get('/professionals', [ProfessionalController::class, 'index']);
 Route::get('/professionals/{id}', [ProfessionalController::class, 'show']);
 Route::get('/professionals/{id}/reviews', [ReviewController::class, 'indexForProfessional']);
 Route::get('/professionals/{id}/portfolio', [PortfolioController::class, 'index']);
+Route::get('/professionals/{id}/passport', [PassportController::class, 'show']);
+Route::get('/passport/skill-suggestions', [PassportController::class, 'skillSuggestions']);
 
 Route::get('/services', [ServiceController::class, 'index']);
 
@@ -105,6 +108,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/professional/portfolio', [PortfolioController::class, 'store']);
     Route::delete('/professional/portfolio/{id}', [PortfolioController::class, 'destroy']);
     Route::put('/professional/portfolio/reorder', [PortfolioController::class, 'reorder']);
+
+    // YULUK Passport (owner management)
+    Route::get('/professional/passport', [PassportController::class, 'mine']);
+    Route::post('/professional/skills', [PassportController::class, 'storeSkill']);
+    Route::delete('/professional/skills/{id}', [PassportController::class, 'destroySkill']);
+    Route::post('/professional/certifications', [PassportController::class, 'storeCertification']);
+    Route::delete('/professional/certifications/{id}', [PassportController::class, 'destroyCertification']);
+    Route::post('/professional/workplaces', [PassportController::class, 'storeWorkplace']);
+    Route::put('/professional/workplaces/{id}', [PassportController::class, 'updateWorkplace']);
+    Route::delete('/professional/workplaces/{id}', [PassportController::class, 'destroyWorkplace']);
 
     // Messages / chat
     Route::get('/messages/conversations', [MessageController::class, 'conversations']);
