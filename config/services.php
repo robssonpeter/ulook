@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    // App store listings linked from the public site; unset = "coming soon".
+    'yuluk' => [
+        'customer_ios_url' => env('YULUK_CUSTOMER_IOS_URL'),
+        'customer_android_url' => env('YULUK_CUSTOMER_ANDROID_URL'),
+        'business_ios_url' => env('YULUK_BUSINESS_IOS_URL'),
+        'business_android_url' => env('YULUK_BUSINESS_ANDROID_URL'),
+    ],
+
 ];

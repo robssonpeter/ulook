@@ -15,7 +15,22 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+                sans: ['Poppins', ...defaultTheme.fontFamily.sans],
+            },
+            // YuLuk brand, shared with the mobile apps.
+            colors: {
+                plum: {
+                    DEFAULT: '#2E1B2E',
+                    dark: '#241322',
+                    soft: '#EDE6EC',
+                },
+                gold: {
+                    DEFAULT: '#C99A3F',
+                    soft: '#F6ECD8',
+                },
+                cream: '#FBF7F2',
+                ink: '#2A222A',
+                muted: '#8A7F88',
             },
         },
     },
