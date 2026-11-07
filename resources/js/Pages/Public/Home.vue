@@ -174,7 +174,16 @@ const businessPoints = [
                             {{ point }}
                         </li>
                     </ul>
-                    <div class="mt-8">
+                    <div class="mt-8 flex flex-wrap items-center gap-4">
+                        <Link
+                            :href="route('register', { as: 'professional' })"
+                            class="rounded-xl bg-[#D9A845] px-6 py-3 font-semibold text-black transition hover:brightness-110"
+                        >
+                            Join as a professional
+                        </Link>
+                        <span class="text-sm text-white/50">or get the app</span>
+                    </div>
+                    <div class="mt-4">
                         <StoreButtons :links="storeLinks.business" />
                     </div>
                 </div>

@@ -5,11 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\BookingResource;
 use App\Models\Booking;
-use App\Models\Professional;
-use App\Models\ProfessionalService;
-use App\Models\User;
-use App\Notifications\BookingStatusNotification;
-use App\Notifications\NewBookingNotification;
+use App\Services\BookingService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -29,13 +25,13 @@ class BookingController extends Controller
         return BookingResource::collection($query->latest()->paginate());
     }
 
-    public function store(Request $request)
+    public function store(Request $request, BookingService $bookings)
     {
         if ($request->user()->role !== 'customer') {
             return response()->json(['message' => 'Only customers can create bookings.'], 403);
         }
 
-        $request->validate([
+        $data = $request->validate([
             'professional_id'         => 'required',
             'service_id'              => 'nullable|exists:services,id',
             'professional_service_id' => 'nullable|exists:professional_services,id',
@@ -50,67 +46,12 @@ class BookingController extends Controller
             'customer_longitude'      => 'nullable|numeric|between:-180,180',
         ]);
 
-        if ($request->input('type') === 'request' && empty($request->customer_address)) {
-            return response()->json([
-                'message' => 'Customer address is required for home service requests.',
-                'errors'  => ['customer_address' => ['Address is required for home service requests.']],
-            ], 422);
-        }
-
-        if (! $request->service_id && ! $request->professional_service_id) {
-            return response()->json(['message' => 'Service is required.'], 422);
-        }
-
-        $professionalId = $request->professional_id;
-
-        $professionalUser = User::where('id', $professionalId)->where('role', 'professional')->first();
-
-        if (! $professionalUser) {
-            $professional = Professional::find($professionalId);
-            if ($professional) {
-                $professionalUser = User::where('id', $professional->user_id)->where('role', 'professional')->first();
-            }
-        }
-
-        if (! $professionalUser) {
-            return response()->json([
-                'message' => 'The selected professional is invalid.',
-                'errors'  => ['professional_id' => ['The selected professional is invalid.']],
-            ], 422);
-        }
-
-        $booking = Booking::create([
-            'customer_id'             => $request->user()->id,
-            'professional_id'         => $professionalUser->id,
-            'service_id'              => $request->service_id ?? ($request->professional_service_id ? ProfessionalService::find($request->professional_service_id)?->service_id : null),
-            'professional_service_id' => $request->professional_service_id,
-            'booking_date'            => $request->booking_date,
-            'booking_time'            => $request->booking_time,
-            'total_price'             => $request->total_price,
-            'deposit_amount'          => $request->deposit_amount ?? null,
-            'status'                  => 'pending',
-            'type'                    => $request->input('type', 'booking'),
-            'venue_type'              => $request->venue_type,
-            'customer_address'        => $request->customer_address,
-            'customer_latitude'       => $request->customer_latitude,
-            'customer_longitude'      => $request->customer_longitude,
-        ]);
-
-        $booking->load(['customer', 'professional', 'service', 'professionalService']);
-
-        // Notify professional of new booking
-        if ($professionalUser->email) {
-            try {
-                $professionalUser->notify(new NewBookingNotification($booking));
-            } catch (\Exception $e) {
-                // Non-fatal: log but don't fail the request
-            }
-        }
+        $booking = $bookings->create($request->user(), $data);
 
         return (new BookingResource($booking))->response()->setStatusCode(201);
     }
 
-    public function updateStatus(Request $request, $id)
+    public function updateStatus(Request $request, BookingService $bookings, $id)
     {
         $user = $request->user();
 
@@ -123,17 +64,7 @@ class BookingController extends Controller
 
             $request->validate(['status' => ['required', Rule::in(['cancelled'])]]);
 
-            $currentStatus = $booking->status;
-            $booking->update(['status' => 'cancelled']);
-
-            // Notify customer of their own cancellation confirmation
-            if ($user->email) {
-                try {
-                    $user->notify(new BookingStatusNotification($booking->load(['professionalService', 'service']), $currentStatus));
-                } catch (\Exception $e) {
-                    // Non-fatal
-                }
-            }
+            $bookings->cancelByCustomer($user, $booking);
 
             return new BookingResource($booking->load(['customer', 'professional', 'service']));
         }
@@ -149,46 +80,7 @@ class BookingController extends Controller
             'completion_code' => ['nullable', 'string'],
         ]);
 
-        $newStatus     = $validated['status'];
-        $currentStatus = $booking->status;
-
-        $allowed = false;
-        if ($newStatus === 'cancelled') {
-            $allowed = true;
-        } elseif ($currentStatus === 'pending' && $newStatus === 'confirmed') {
-            $allowed = true;
-        } elseif ($currentStatus === 'confirmed' && $newStatus === 'completed') {
-            $allowed = true;
-        }
-
-        if (! $allowed) {
-            return response()->json(['message' => "Invalid status transition from {$currentStatus} to {$newStatus}."], 422);
-        }
-
-        if ($newStatus === 'completed') {
-            // Proof of delivery: the professional must enter the code shown
-            // to the customer in their app.
-            if ($booking->completion_code
-                && ! hash_equals($booking->completion_code, trim((string) $request->input('completion_code')))) {
-                return response()->json([
-                    'message' => 'Incorrect completion code. Ask the customer for the 4-digit code shown in their app.',
-                    'errors'  => ['completion_code' => ['Incorrect completion code.']],
-                ], 422);
-            }
-            $booking->update(['status' => 'completed', 'completed_at' => now()]);
-        } else {
-            $booking->update(['status' => $newStatus]);
-        }
-
-        // Notify the customer of the status change
-        $customer = User::find($booking->customer_id);
-        if ($customer?->email) {
-            try {
-                $customer->notify(new BookingStatusNotification($booking->load(['professionalService', 'service']), $currentStatus));
-            } catch (\Exception $e) {
-                // Non-fatal
-            }
-        }
+        $bookings->transitionByProfessional($booking, $validated['status'], $validated['completion_code'] ?? null);
 
         return new BookingResource($booking->load(['customer', 'professional', 'service']));
     }

@@ -1,14 +1,34 @@
 <script setup>
 import { computed } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
+import Field from '@/Components/Public/Field.vue';
 import StoreButtons from '@/Components/Public/StoreButtons.vue';
-import { avatarUrl, categoryPhoto, formatDuration, formatPrice } from '@/yuluk';
+import { avatarUrl, categoryPhoto, formatDuration, formatPrice, todayIso } from '@/yuluk';
 
 const props = defineProps({
     professional: { type: Object, required: true },
+    bookable: { type: Array, required: true },
+    isOwnProfile: { type: Boolean, default: false },
     storeLinks: { type: Object, required: true },
 });
+
+const user = computed(() => usePage().props.auth?.user);
+const firstName = computed(() => props.professional.name.split(' ')[0]);
+
+const booking = useForm({
+    professional_service_id: props.bookable[0]?.id ?? '',
+    booking_date: '',
+    booking_time: '',
+    type: 'booking',
+    customer_address: '',
+});
+
+const chosen = computed(() => props.bookable.find((s) => s.id === Number(booking.professional_service_id)));
+
+function book() {
+    booking.post(route('bookings.store'), { preserveScroll: true });
+}
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -107,13 +127,76 @@ const photos = computed(() => props.professional.portfolio_photos || []);
 
                 <!-- Sidebar -->
                 <aside class="space-y-6 lg:sticky lg:top-24 lg:self-start">
-                    <div class="rounded-2xl bg-plum p-6 text-white">
-                        <h2 class="text-lg font-semibold">Book {{ professional.name.split(' ')[0] }}</h2>
-                        <p class="mt-2 text-sm text-white/70">
-                            Booking happens in the YuLuk app: visit them, or request them to come to you.
+                    <div id="book" class="scroll-mt-24 rounded-2xl bg-plum p-6 text-white">
+                        <h2 class="text-lg font-semibold">Book {{ firstName }}</h2>
+
+                        <p v-if="!bookable.length" class="mt-2 text-sm text-white/70">
+                            {{ firstName }} hasn’t opened bookings yet. Check back soon.
                         </p>
-                        <div class="mt-5">
-                            <StoreButtons :links="storeLinks.customer" />
+
+                        <template v-else-if="isOwnProfile">
+                            <p class="mt-2 text-sm text-white/70">This is how clients see your profile.</p>
+                            <Link :href="route('business.profile')" class="mt-4 inline-block rounded-xl bg-gold px-4 py-2.5 text-sm font-semibold text-plum-dark">
+                                Edit services &amp; prices
+                            </Link>
+                        </template>
+
+                        <template v-else-if="!user">
+                            <p class="mt-2 text-sm text-white/70">Pick a time, at their place or yours. Sign in or create a free account to book.</p>
+                            <Link :href="route('book.start', professional.id)" class="mt-4 block rounded-xl bg-gold px-4 py-3 text-center font-semibold text-plum-dark transition hover:brightness-110">
+                                Book now
+                            </Link>
+                        </template>
+
+                        <p v-else-if="user.role !== 'customer'" class="mt-2 text-sm text-white/70">
+                            You’re signed in with a business account. Use a customer account to make bookings.
+                        </p>
+
+                        <form v-else class="mt-4 space-y-4 text-ink [&_label]:text-white/90" @submit.prevent="book">
+                            <Field id="bk-service" label="Service" :error="booking.errors.professional_service_id">
+                                <select id="bk-service" v-model="booking.professional_service_id" class="yl-input py-2.5" required>
+                                    <option v-for="s in bookable" :key="s.id" :value="s.id">
+                                        {{ s.name }} · {{ s.price > 0 ? formatPrice(s.price) : 'price on request' }}
+                                    </option>
+                                </select>
+                            </Field>
+                            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                                <Field id="bk-date" label="Date" :error="booking.errors.booking_date">
+                                    <input id="bk-date" v-model="booking.booking_date" type="date" :min="todayIso()" class="yl-input py-2.5" required>
+                                </Field>
+                                <Field id="bk-time" label="Time" :error="booking.errors.booking_time">
+                                    <input id="bk-time" v-model="booking.booking_time" type="time" step="900" class="yl-input py-2.5" required>
+                                </Field>
+                            </div>
+                            <fieldset>
+                                <legend class="text-sm font-medium text-white/90">Where?</legend>
+                                <div class="mt-1.5 grid grid-cols-2 gap-2 text-sm">
+                                    <label
+                                        v-for="opt in [{ v: 'booking', t: 'At their place' }, { v: 'request', t: 'Come to me' }]"
+                                        :key="opt.v"
+                                        :class="booking.type === opt.v ? 'bg-gold text-plum-dark' : 'bg-white/10 text-white hover:bg-white/20'"
+                                        class="cursor-pointer rounded-xl px-3 py-2.5 text-center font-semibold transition"
+                                    >
+                                        <input v-model="booking.type" type="radio" :value="opt.v" class="sr-only">
+                                        {{ opt.t }}
+                                    </label>
+                                </div>
+                            </fieldset>
+                            <Field v-if="booking.type === 'request'" id="bk-address" label="Your address" :error="booking.errors.customer_address">
+                                <textarea id="bk-address" v-model="booking.customer_address" rows="2" class="yl-input py-2.5" placeholder="Street, area, landmark" required />
+                            </Field>
+                            <p v-if="booking.errors.booking" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ booking.errors.booking }}</p>
+                            <button type="submit" class="w-full rounded-xl bg-gold px-4 py-3 font-semibold text-plum-dark transition hover:brightness-110 disabled:opacity-60" :disabled="booking.processing">
+                                Request booking<template v-if="chosen?.price"> · {{ formatPrice(chosen.price) }}</template>
+                            </button>
+                            <p class="text-center text-xs text-white/60">{{ firstName }} will confirm your time. You can follow it under My bookings.</p>
+                        </form>
+
+                        <div class="mt-6 border-t border-white/10 pt-5">
+                            <p class="text-xs text-white/60">Prefer the app?</p>
+                            <div class="mt-3">
+                                <StoreButtons :links="storeLinks.customer" />
+                            </div>
                         </div>
                     </div>
 

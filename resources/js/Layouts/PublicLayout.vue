@@ -1,6 +1,6 @@
 <script setup>
-import { ref } from 'vue';
-import { Link } from '@inertiajs/vue3';
+import { computed, ref, watch } from 'vue';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import YulukMark from '@/Components/Public/YulukMark.vue';
 
 // "dark" puts the header over the plum hero; "light" is for content pages.
@@ -9,6 +9,26 @@ defineProps({
 });
 
 const menuOpen = ref(false);
+
+const page = usePage();
+const user = computed(() => page.props.auth?.user);
+const isPro = computed(() => user.value?.role === 'professional');
+
+// Success banners come from the session flash; errors not tied to a field
+// (e.g. booking as the wrong account type) are shown here too.
+const banner = ref(null);
+watch(
+    () => [page.props.jetstream?.flash?.banner, page.props.errors],
+    ([flash, errors]) => {
+        const general = errors?.booking || errors?.status;
+        banner.value = general ? { text: general, error: true } : flash ? { text: flash, error: false } : null;
+    },
+    { immediate: true },
+);
+
+function signOut() {
+    router.post(route('logout'));
+}
 const year = new Date().getFullYear();
 </script>
 
@@ -31,12 +51,24 @@ const year = new Date().getFullYear();
                     <a :href="route('home') + '#business'" class="opacity-80 transition hover:opacity-100">
                         For professionals
                     </a>
-                    <a
-                        :href="route('home') + '#get-the-app'"
-                        class="rounded-full bg-gold px-5 py-2.5 font-semibold text-plum-dark transition hover:brightness-110"
-                    >
-                        Get the app
-                    </a>
+                    <template v-if="user">
+                        <Link
+                            :href="isPro ? route('business.dashboard') : route('account.bookings')"
+                            class="opacity-80 transition hover:opacity-100"
+                        >
+                            {{ isPro ? 'My business' : 'My bookings' }}
+                        </Link>
+                        <button type="button" class="opacity-80 transition hover:opacity-100" @click="signOut">Sign out</button>
+                    </template>
+                    <template v-else>
+                        <Link :href="route('login')" class="opacity-80 transition hover:opacity-100">Sign in</Link>
+                        <Link
+                            :href="route('register')"
+                            class="rounded-full bg-gold px-5 py-2.5 font-semibold text-plum-dark transition hover:brightness-110"
+                        >
+                            Join YuLuk
+                        </Link>
+                    </template>
                 </nav>
 
                 <button
@@ -60,11 +92,32 @@ const year = new Date().getFullYear();
                 <a :href="route('home') + '#business'" class="block rounded-lg px-3 py-2 hover:bg-white/10" @click="menuOpen = false">
                     For professionals
                 </a>
-                <a :href="route('home') + '#get-the-app'" class="block rounded-lg px-3 py-2 font-semibold text-gold" @click="menuOpen = false">
-                    Get the app
-                </a>
+                <template v-if="user">
+                    <Link
+                        :href="isPro ? route('business.dashboard') : route('account.bookings')"
+                        class="block rounded-lg px-3 py-2 hover:bg-white/10"
+                    >
+                        {{ isPro ? 'My business' : 'My bookings' }}
+                    </Link>
+                    <button type="button" class="block w-full rounded-lg px-3 py-2 text-left hover:bg-white/10" @click="signOut">Sign out</button>
+                </template>
+                <template v-else>
+                    <Link :href="route('login')" class="block rounded-lg px-3 py-2 hover:bg-white/10">Sign in</Link>
+                    <Link :href="route('register')" class="block rounded-lg px-3 py-2 font-semibold text-gold">Join YuLuk</Link>
+                </template>
             </nav>
         </header>
+
+        <div v-if="banner" class="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+            <div
+                :class="banner.error ? 'bg-red-50 text-red-800 ring-red-200' : 'bg-gold-soft text-plum ring-gold/30'"
+                class="flex items-center justify-between gap-4 rounded-xl px-4 py-3 text-sm font-medium ring-1"
+                role="status"
+            >
+                <span>{{ banner.text }}</span>
+                <button type="button" class="opacity-60 hover:opacity-100" aria-label="Dismiss" @click="banner = null">&times;</button>
+            </div>
+        </div>
 
         <main>
             <slot />

@@ -79,7 +79,7 @@ class PublicSiteController extends Controller
         ]);
     }
 
-    public function professional(Professional $professional): Response
+    public function professional(Request $request, Professional $professional): Response
     {
         $professional->load([
             'user',
@@ -90,6 +90,13 @@ class PublicSiteController extends Controller
 
         return Inertia::render('Public/ProfessionalShow', [
             'professional' => $this->plain(new ProfessionalResource($professional)),
+            // Catalogue rows (not services) are what a booking references.
+            'bookable' => $professional->professionalServices()
+                ->where('is_active', true)
+                ->orderBy('price')
+                ->get(['id', 'name', 'price', 'duration_minutes'])
+                ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'price' => (float) $s->price, 'duration' => $s->duration_minutes]),
+            'isOwnProfile' => $request->user()?->id === $professional->user_id,
             'storeLinks' => $this->storeLinks(),
         ]);
     }

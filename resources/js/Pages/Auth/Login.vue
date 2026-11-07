@@ -1,18 +1,14 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import AuthenticationCard from '@/Components/AuthenticationCard.vue';
-import AuthenticationCardLogo from '@/Components/AuthenticationCardLogo.vue';
-import Checkbox from '@/Components/Checkbox.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
+import PublicLayout from '@/Layouts/PublicLayout.vue';
+import Field from '@/Components/Public/Field.vue';
 
 defineProps({
     canResetPassword: Boolean,
     status: String,
 });
 
+// Fortify's "email" field accepts an email or a phone number.
 const form = useForm({
     email: '',
     password: '',
@@ -20,7 +16,7 @@ const form = useForm({
 });
 
 const submit = () => {
-    form.transform(data => ({
+    form.transform((data) => ({
         ...data,
         remember: form.remember ? 'on' : '',
     })).post(route('login'), {
@@ -30,61 +26,43 @@ const submit = () => {
 </script>
 
 <template>
-    <Head title="Log in" />
+    <Head title="Sign in" />
 
-    <AuthenticationCard>
-        <template #logo>
-            <AuthenticationCardLogo />
-        </template>
+    <PublicLayout>
+        <div class="mx-auto max-w-md px-4 py-16">
+            <div class="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-plum/5">
+                <h1 class="text-2xl font-semibold">Welcome back</h1>
+                <p class="mt-1 text-sm text-muted">Sign in to book or manage your business.</p>
 
-        <div v-if="status" class="mb-4 font-medium text-sm text-green-600 dark:text-green-400">
-            {{ status }}
+                <div v-if="status" class="mt-4 rounded-xl bg-gold-soft px-4 py-3 text-sm text-plum">{{ status }}</div>
+
+                <form class="mt-6 space-y-5" @submit.prevent="submit">
+                    <Field id="email" label="Email or phone number" :error="form.errors.email">
+                        <input id="email" v-model="form.email" type="text" class="yl-input" required autofocus autocomplete="username">
+                    </Field>
+
+                    <Field id="password" label="Password" :error="form.errors.password">
+                        <input id="password" v-model="form.password" type="password" class="yl-input" required autocomplete="current-password">
+                    </Field>
+
+                    <div class="flex items-center justify-between text-sm">
+                        <label class="flex items-center gap-2">
+                            <input v-model="form.remember" type="checkbox" class="rounded border-plum/30 text-plum focus:ring-gold">
+                            <span class="text-muted">Remember me</span>
+                        </label>
+                        <Link v-if="canResetPassword" :href="route('password.request')" class="font-medium text-plum hover:text-gold">
+                            Forgot password?
+                        </Link>
+                    </div>
+
+                    <button type="submit" class="yl-btn w-full" :disabled="form.processing">Sign in</button>
+                </form>
+
+                <p class="mt-6 text-center text-sm text-muted">
+                    New to YuLuk?
+                    <Link :href="route('register')" class="font-semibold text-plum hover:text-gold">Create an account</Link>
+                </p>
+            </div>
         </div>
-
-        <form @submit.prevent="submit">
-            <div>
-                <InputLabel for="email" value="Email" />
-                <TextInput
-                    id="email"
-                    v-model="form.email"
-                    type="email"
-                    class="mt-1 block w-full"
-                    required
-                    autofocus
-                    autocomplete="username"
-                />
-                <InputError class="mt-2" :message="form.errors.email" />
-            </div>
-
-            <div class="mt-4">
-                <InputLabel for="password" value="Password" />
-                <TextInput
-                    id="password"
-                    v-model="form.password"
-                    type="password"
-                    class="mt-1 block w-full"
-                    required
-                    autocomplete="current-password"
-                />
-                <InputError class="mt-2" :message="form.errors.password" />
-            </div>
-
-            <div class="block mt-4">
-                <label class="flex items-center">
-                    <Checkbox v-model:checked="form.remember" name="remember" />
-                    <span class="ms-2 text-sm text-gray-600 dark:text-gray-400">Remember me</span>
-                </label>
-            </div>
-
-            <div class="flex items-center justify-end mt-4">
-                <Link v-if="canResetPassword" :href="route('password.request')" class="underline text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800">
-                    Forgot your password?
-                </Link>
-
-                <PrimaryButton class="ms-4" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                    Log in
-                </PrimaryButton>
-            </div>
-        </form>
-    </AuthenticationCard>
+    </PublicLayout>
 </template>

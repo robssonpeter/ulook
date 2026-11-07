@@ -50,3 +50,16 @@ export function avatarUrl(url) {
     u.searchParams.set('background', '2E1B2E');
     return u.toString();
 }
+
+// "2026-11-08" -> "Sun, 8 Nov 2026" (parsed as a local date, not UTC midnight).
+export function formatDate(isoDate) {
+    if (!isoDate) return '';
+    const [y, m, d] = isoDate.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// Today's date as YYYY-MM-DD in the visitor's timezone, for <input type="date" min>.
+export function todayIso() {
+    const now = new Date();
+    return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
